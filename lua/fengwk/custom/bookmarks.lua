@@ -12,7 +12,7 @@ local data_cache = nil
 
 -- 插件的默认配置
 local config = {
-  search_range = 150,
+  search_range = 300,
   sign = {
     enabled = true,
     name = "BookmarkSign",

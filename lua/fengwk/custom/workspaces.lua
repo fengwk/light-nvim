@@ -174,11 +174,16 @@ function M.auto_record_workspace_buffer()
     return
   end
 
-  data[current_workspace] = {
-    last_file = utils.normalize_path(file_path),
-  }
-  data_cache = data
-  write_data()
+  local last_file = utils.normalize_path(file_path)
+  if vim.startswith(last_file, current_workspace) then
+    vim.schedule(function()
+      data[current_workspace] = {
+        last_file = last_file,
+      }
+      data_cache = data
+      write_data()
+    end)
+  end
 end
 
 function M.update_current_workspace()
@@ -216,8 +221,12 @@ function M.setup()
     pattern = "*",
     callback = function()
       M.update_current_workspace()
-      if vim.fn.argc() == 0 and current_workspace then
-        M.open(current_workspace, true)
+      if vim.fn.argc() == 0 then
+        if current_workspace then
+          M.open(current_workspace, true)
+        end
+      else
+        M.auto_record_workspace_buffer()
       end
     end,
   })
@@ -230,7 +239,7 @@ function M.setup()
   })
 
   -- 进入缓冲区后自动记录
-  vim.api.nvim_create_autocmd("BufEnter", {
+  vim.api.nvim_create_autocmd({ "BufEnter" }, {
     group = group,
     callback = M.auto_record_workspace_buffer,
   })

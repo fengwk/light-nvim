@@ -135,9 +135,9 @@ return {
           telescope_themes.get_dropdown {},
         },
 
-        -- ["jdtls"] = {
-        --   telescope_themes.get_dropdown {},
-        -- },
+        ["jdtls"] = {
+          telescope_themes.get_dropdown {},
+        },
 
         ["bookmarks"] = {
           telescope_themes.get_dropdown {},
@@ -164,7 +164,7 @@ return {
     telescope.load_extension("ui-select")
     telescope.load_extension("workspaces")
     telescope.load_extension("live_grep_args")
-    -- telescope.load_extension("jdtls")
+    telescope.load_extension("jdtls")
     -- telescope.load_extension("diff")
     telescope.load_extension("bookmarks")
     telescope.load_extension("smart_history")
