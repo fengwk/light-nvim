@@ -20,6 +20,14 @@ return {
         -- 将仅包含单层子目录的目录链合并为一个节点
         group_empty = true,
       },
+      -- 宽度跟随最长可见行自适应,封顶 80 列
+      view = {
+        width = {
+          min = 20,
+          max = 50,
+          padding = 1,
+        },
+      },
     }
 
     local keymap = vim.keymap.set
