@@ -226,20 +226,20 @@ return {
     event = "VeryLazy",
     opts = {},
   },
-  {
-    "rcarriga/nvim-notify",
-    opts = {
-      -- 限制通知宽度并在超长消息时自动换行，避免 print 桥接后的长文本打断输入。
-      render = "wrapped-compact",
-      max_width = function()
-        return math.min(120, math.floor(vim.o.columns * 0.5))
-      end,
-    },
-    config = function(_, opts)
-      local notify = require "notify"
-      notify.setup(opts)
-      vim.notify = notify
-      -- setup_print_notify_bridge()
-    end,
-  },
+  -- {
+  --   "rcarriga/nvim-notify",
+  --   opts = {
+  --     -- 限制通知宽度并在超长消息时自动换行，避免 print 桥接后的长文本打断输入。
+  --     render = "wrapped-compact",
+  --     max_width = function()
+  --       return math.min(120, math.floor(vim.o.columns * 0.5))
+  --     end,
+  --   },
+  --   config = function(_, opts)
+  --     local notify = require "notify"
+  --     notify.setup(opts)
+  --     vim.notify = notify
+  --     -- setup_print_notify_bridge()
+  --   end,
+  -- },
 }
