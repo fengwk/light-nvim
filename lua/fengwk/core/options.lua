@@ -82,78 +82,89 @@ vim.opt.clipboard = "unnamedplus"
 
 local osc52_ok, osc52 = pcall(require, "vim.ui.clipboard.osc52")
 
-local function unnamed_paste()
+local function has_env(name)
+  local value = vim.env[name]
+  return value ~= nil and value ~= ""
+end
+
+local function internal_paste()
   return vim.split(vim.fn.getreg('"'), "\n"), vim.fn.getregtype('"')
 end
 
--- WSL 下：
--- copy 走 OSC 52 写到 pty，由 tmux 中转到 Windows Terminal，落进 Windows 剪贴板。
--- paste 走 win32yank.exe 读 Windows 剪贴板（与 OSC 52 写入对应）。
-if utils.os == "wsl" and utils.has_cmd("win32yank.exe") then
-  local copy = nil
-  local clipboard_name = 'wsl-win32yank'
-  if osc52_ok then
-    copy = {
-      ['+'] = osc52.copy('+'),
-      ['*'] = osc52.copy('*'),
-    }
-    clipboard_name = 'wsl-osc52-win32yank'
-  else
-    copy = {
-      ['+'] = 'timeout 2s win32yank.exe -i --crlf',
-      ['*'] = 'timeout 2s win32yank.exe -i --crlf',
-    }
+local function osc52_copy()
+  return {
+    ["+"] = osc52.copy("+"),
+    ["*"] = osc52.copy("*"),
+  }
+end
+
+local function setup_osc52_copy_only(name)
+  vim.g.clipboard = {
+    name = name,
+    copy = osc52_copy(),
+    paste = {
+      ["+"] = internal_paste,
+      ["*"] = internal_paste,
+    },
+    cache_enabled = 0,
+  }
+end
+
+local is_ssh = has_env("SSH_TTY") or has_env("SSH_CONNECTION")
+local in_tmux = has_env("TMUX")
+
+-- SSH 下通过 OSC 52 将复制内容写回客户端。多数终端不支持读取剪贴板，
+-- 因此粘贴保留 Neovim 内部寄存器，避免等待 OSC 52 响应时卡住。
+if is_ssh and osc52_ok then
+  setup_osc52_copy_only("OSC 52 (SSH)")
+elseif utils.os == "wsl" and utils.has_cmd("win32yank.exe") then
+  -- WSL 与 Windows 剪贴板的桥接可能卡死。tmux 中复制优先走 OSC 52；
+  -- 其他复制及所有粘贴使用带强制终止的 win32yank，避免 Neovim 无限等待。
+  local win32yank_copy = { "timeout", "-k", "1s", "2s", "win32yank.exe", "-i", "--crlf" }
+  local win32yank_paste = { "timeout", "-k", "1s", "2s", "win32yank.exe", "-o", "--lf" }
+  local clipboard_name = "wsl-win32yank"
+  local copy = {
+    ["+"] = win32yank_copy,
+    ["*"] = win32yank_copy,
+  }
+
+  if in_tmux and osc52_ok then
+    clipboard_name = "wsl-osc52-win32yank"
+    copy = osc52_copy()
   end
 
   vim.g.clipboard = {
     name = clipboard_name,
     copy = copy,
     paste = {
-      -- timeout 2s 防止新版 Windows 上 win32yank.exe panic 死锁时 nvim hang
-      ['+'] = 'timeout 2s win32yank.exe -o --lf',
-      ['*'] = 'timeout 2s win32yank.exe -o --lf',
+      ["+"] = win32yank_paste,
+      ["*"] = win32yank_paste,
     },
     cache_enabled = 0,
   }
--- ssh 或 tmux 环境支持 osc52，使远程连接和 tmux 会话都能共享剪切板。
-elseif (os.getenv("SSH_TTY") ~= nil or os.getenv("TMUX") ~= nil) and osc52_ok then
+elseif has_env("WAYLAND_DISPLAY") and utils.has_cmd("wl-copy") and utils.has_cmd("wl-paste") then
   vim.g.clipboard = {
-    name = 'OSC 52',
+    name = "wl-clipboard",
     copy = {
-      ['+'] = osc52.copy('+'),
-      ['*'] = osc52.copy('*'),
+      ["+"] = { "wl-copy", "--type", "text/plain" },
+      ["*"] = { "wl-copy", "--primary", "--type", "text/plain" },
     },
-    -- osc52 的黏贴会卡住。
-    -- https://zhuanlan.zhihu.com/p/712125953
     paste = {
-      ['+'] = unnamed_paste,
-      ['*'] = unnamed_paste,
+      ["+"] = { "wl-paste", "--no-newline" },
+      ["*"] = { "wl-paste", "--no-newline", "--primary" },
     },
     cache_enabled = 0,
   }
-elseif os.getenv("WAYLAND_DISPLAY") ~= nil and utils.has_cmd("wl-copy") and utils.has_cmd("wl-paste") then
+elseif has_env("DISPLAY") and utils.has_cmd("xclip") then
   vim.g.clipboard = {
-    name = 'wl-clipboard',
+    name = "xclip",
     copy = {
-      ['+'] = 'wl-copy --type text/plain',
-      ['*'] = 'wl-copy --primary --type text/plain',
+      ["+"] = { "xclip", "-selection", "clipboard", "-in" },
+      ["*"] = { "xclip", "-selection", "primary", "-in" },
     },
     paste = {
-      ['+'] = 'wl-paste --no-newline',
-      ['*'] = 'wl-paste --no-newline --primary',
-    },
-    cache_enabled = 0,
-  }
-elseif utils.has_cmd("xclip") then
-  vim.g.clipboard = {
-    name = 'xclip',
-    copy = {
-      ['+'] = 'xclip -selection clipboard -in',
-      ['*'] = 'xclip -selection primary -in',
-    },
-    paste = {
-      ['+'] = 'xclip -selection clipboard -out',
-      ['*'] = 'xclip -selection primary -out',
+      ["+"] = { "xclip", "-selection", "clipboard", "-out" },
+      ["*"] = { "xclip", "-selection", "primary", "-out" },
     },
     cache_enabled = 0,
   }

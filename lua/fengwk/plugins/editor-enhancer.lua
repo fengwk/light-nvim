@@ -1,6 +1,23 @@
 local globals = require "fengwk.globals"
 local utils = require "fengwk.utils"
 
+-- substitute.nvim 显式读取寄存器，需要按 clipboard 选项解析默认无名寄存器。
+local function substitute_action(method)
+  return function()
+    local register = vim.v.register
+    if register == '"' then
+      local clipboard = vim.opt.clipboard:get()
+      if vim.tbl_contains(clipboard, "unnamedplus") then
+        register = "+"
+      elseif vim.tbl_contains(clipboard, "unnamed") then
+        register = "*"
+      end
+    end
+
+    require("substitute")[method]({ register = register })
+  end
+end
+
 -- 桥接 print 会出 bug，如 nvimtree 的 pick 就会失效
 -- local function setup_print_notify_bridge()
 --   _G.print = function(...)
@@ -48,10 +65,10 @@ return {
     event = "VeryLazy",
     opts = {},
     keys = {
-      { "rs",  function() require "substitute".operator() end, mode = "n" },
-      { "rss", function() require "substitute".line() end,     mode = "n" },
-      { "rS",  function() require "substitute".eol() end,      mode = "n" },
-      { "rs",  function() require "substitute".visual() end,   mode = "x" },
+      { "rs",  substitute_action("operator"), mode = "n" },
+      { "rss", substitute_action("line"),     mode = "n" },
+      { "rS",  substitute_action("eol"),      mode = "n" },
+      { "rs",  substitute_action("visual"),   mode = "x" },
     },
   },
   {
